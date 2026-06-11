@@ -72,6 +72,18 @@ enum Commands {
         #[arg(long)]
         tls: bool,
 
+        /// 允许动态调整窗口大小
+        #[arg(long)]
+        dynamic_resolution: bool,
+
+        /// 桌面缩放百分比 (100-500)
+        #[arg(long)]
+        scale_desktop: Option<u32>,
+
+        /// 智能缩放以适应窗口
+        #[arg(long)]
+        smart_sizing: bool,
+
         /// 附加的 xfreerdp3 参数
         #[arg(last = true)]
         extra_args: Vec<String>,
@@ -150,6 +162,9 @@ fn main() -> anyhow::Result<()> {
             audio,
             nla,
             tls,
+            dynamic_resolution,
+            scale_desktop,
+            smart_sizing,
             extra_args,
         }) => {
             let mut builder = ConnectionBuilder::new(server);
@@ -170,10 +185,16 @@ fn main() -> anyhow::Result<()> {
                 .clipboard(*clipboard)
                 .audio(*audio)
                 .nla(*nla)
-                .tls(*tls);
+                .tls(*tls)
+                .dynamic_resolution(*dynamic_resolution)
+                .smart_sizing(*smart_sizing);
 
             if let Some(drive_path) = drive {
                 builder.drive(drive_path);
+            }
+
+            if let Some(scale) = scale_desktop {
+                builder.scale_desktop(*scale);
             }
 
             builder.extra_args(extra_args.clone());
@@ -218,6 +239,12 @@ fn main() -> anyhow::Result<()> {
                 username.clone(),
                 domain.clone(),
                 description.clone(),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
             );
             updated_config.save()?;
             println!(

@@ -161,6 +161,25 @@ fn connect_to(conn: &ConnectionConfig) -> Result<()> {
         builder.password(&password);
     }
 
+    // 应用保存的设置
+    if let Some(width) = conn.width {
+        if let Some(height) = conn.height {
+            builder.size(width, height);
+        }
+    }
+    if let Some(fullscreen) = conn.fullscreen {
+        builder.fullscreen(fullscreen);
+    }
+    if let Some(dr) = conn.dynamic_resolution {
+        builder.dynamic_resolution(dr);
+    }
+    if let Some(scale) = conn.scale_desktop {
+        builder.scale_desktop(scale);
+    }
+    if let Some(ss) = conn.smart_sizing {
+        builder.smart_sizing(ss);
+    }
+
     println!("\n{} 正在连接到 {}...", "🚀".green(), conn.server.cyan());
     builder.connect()?;
 
@@ -203,6 +222,61 @@ fn edit_connection(config: &Config, conn: &ConnectionConfig) -> Result<()> {
         .allow_empty(true)
         .interact_text()?;
 
+    // 显示设置
+    println!("\n{} 显示设置", "🖥️ ".cyan());
+    println!("{}", "─".repeat(40));
+
+    let current_width = conn.width.map(|w| w.to_string()).unwrap_or_default();
+    let width_str: String = Input::new()
+        .with_prompt("窗口宽度 (留空使用默认 1920)")
+        .default(current_width)
+        .allow_empty(true)
+        .interact_text()?;
+
+    let current_height = conn.height.map(|h| h.to_string()).unwrap_or_default();
+    let height_str: String = Input::new()
+        .with_prompt("窗口高度 (留空使用默认 1080)")
+        .default(current_height)
+        .allow_empty(true)
+        .interact_text()?;
+
+    let width = width_str.parse::<u32>().ok();
+    let height = height_str.parse::<u32>().ok();
+
+    let current_fullscreen = conn.fullscreen.unwrap_or(false);
+    let fullscreen = Confirm::new()
+        .with_prompt("全屏模式?")
+        .default(current_fullscreen)
+        .show_default(true)
+        .interact()?;
+
+    let current_dynamic_resolution = conn.dynamic_resolution.unwrap_or(false);
+    let dynamic_resolution = Confirm::new()
+        .with_prompt("允许动态调整窗口大小?")
+        .default(current_dynamic_resolution)
+        .show_default(true)
+        .interact()?;
+
+    let current_scale = conn.scale_desktop.map(|s| s.to_string()).unwrap_or_default();
+    let scale_desktop_str: String = Input::new()
+        .with_prompt("桌面缩放百分比 (100-500，留空不缩放)")
+        .default(current_scale)
+        .allow_empty(true)
+        .interact_text()?;
+
+    let scale_desktop = scale_desktop_str.parse::<u32>().ok().filter(|&s| s >= 100 && s <= 500);
+
+    let current_smart_sizing = conn.smart_sizing.unwrap_or(false);
+    let smart_sizing = if dynamic_resolution {
+        false
+    } else {
+        Confirm::new()
+            .with_prompt("智能缩放以适应窗口? (与动态调整互斥)")
+            .default(current_smart_sizing)
+            .show_default(true)
+            .interact()?
+    };
+
     // 保存更新后的配置
     let mut updated_config = config.clone();
     updated_config.save_connection(
@@ -211,6 +285,12 @@ fn edit_connection(config: &Config, conn: &ConnectionConfig) -> Result<()> {
         if username.is_empty() { None } else { Some(username) },
         if domain.is_empty() { None } else { Some(domain) },
         if description.is_empty() { None } else { Some(description) },
+        width,
+        height,
+        if fullscreen { Some(true) } else { None },
+        if dynamic_resolution { Some(true) } else { None },
+        scale_desktop,
+        if smart_sizing { Some(true) } else { None },
     );
     updated_config.save()?;
     println!("{} 连接 '{}' 更新成功！", "✓".green(), name.bold());
@@ -282,6 +362,58 @@ fn create_and_connect(config: &Config) -> Result<()> {
         .with_confirmation("确认密码", "两次密码不匹配")
         .interact()?;
 
+    // 显示显示设置选项
+    println!("\n{} 显示设置", "🖥️ ".cyan());
+    println!("{}", "─".repeat(40));
+
+    let width_str: String = Input::new()
+        .with_prompt("窗口宽度 (留空使用默认 1920)")
+        .default(String::new())
+        .show_default(false)
+        .allow_empty(true)
+        .interact_text()?;
+
+    let height_str: String = Input::new()
+        .with_prompt("窗口高度 (留空使用默认 1080)")
+        .default(String::new())
+        .show_default(false)
+        .allow_empty(true)
+        .interact_text()?;
+
+    let width = width_str.parse::<u32>().ok();
+    let height = height_str.parse::<u32>().ok();
+
+    let fullscreen = Confirm::new()
+        .with_prompt("全屏模式?")
+        .default(false)
+        .show_default(true)
+        .interact()?;
+
+    let dynamic_resolution = Confirm::new()
+        .with_prompt("允许动态调整窗口大小?")
+        .default(true)
+        .show_default(true)
+        .interact()?;
+
+    let scale_desktop_str: String = Input::new()
+        .with_prompt("桌面缩放百分比 (100-500，留空不缩放)")
+        .default(String::new())
+        .show_default(false)
+        .allow_empty(true)
+        .interact_text()?;
+
+    let scale_desktop = scale_desktop_str.parse::<u32>().ok().filter(|&s| s >= 100 && s <= 500);
+
+    let smart_sizing = if dynamic_resolution {
+        false
+    } else {
+        Confirm::new()
+            .with_prompt("智能缩放以适应窗口? (与动态调整互斥)")
+            .default(false)
+            .show_default(true)
+            .interact()?
+    };
+
     // 保存到配置
     let mut updated_config = config.clone();
     updated_config.save_connection(
@@ -290,6 +422,12 @@ fn create_and_connect(config: &Config) -> Result<()> {
         if username.is_empty() { None } else { Some(username.clone()) },
         if domain.is_empty() { None } else { Some(domain) },
         if description.is_empty() { None } else { Some(description) },
+        width,
+        height,
+        if fullscreen { Some(true) } else { None },
+        if dynamic_resolution { Some(true) } else { None },
+        scale_desktop,
+        if smart_sizing { Some(true) } else { None },
     );
     updated_config.save()?;
     println!("{} 连接 '{}' 已保存！", "✓".green(), name.bold());
@@ -301,6 +439,17 @@ fn create_and_connect(config: &Config) -> Result<()> {
     }
     if !password.is_empty() {
         builder.password(&password);
+    }
+
+    // 应用显示设置
+    if let (Some(w), Some(h)) = (width, height) {
+        builder.size(w, h);
+    }
+    builder.fullscreen(fullscreen);
+    builder.dynamic_resolution(dynamic_resolution);
+    builder.smart_sizing(smart_sizing);
+    if let Some(scale) = scale_desktop {
+        builder.scale_desktop(scale);
     }
 
     println!("{} 正在连接到 {}...", "🚀".green(), server.cyan());

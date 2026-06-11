@@ -54,6 +54,7 @@ rrdp select
 - 删除连接（需确认）
 - 新建连接并自动连接
 - Esc 退出 / 返回上一级
+- 显示设置：窗口大小、全屏、动态调整、缩放
 
 ### 命令行模式
 
@@ -92,7 +93,16 @@ rrdp delete <名称>
 | `--audio` | 启用音频输出 |
 | `--nla` | 网络级身份验证 (NLA) |
 | `--tls` | TLS 安全连接 |
+| `--dynamic-resolution` | 允许动态调整窗口大小 |
+| `--scale-desktop <百分比>` | 桌面缩放 (100-500) |
+| `--smart-sizing` | 智能缩放以适应窗口 |
 | `--` | 附加的 xfreerdp3 原生参数 |
+
+### 显示设置说明
+
+- **动态调整** (`--dynamic-resolution`)：连接后可以自由调整窗口大小，远程桌面会自动适应
+- **桌面缩放** (`--scale-desktop`)：设置远程桌面的 DPI 缩放百分比，适合高分屏
+- **智能缩放** (`--smart-sizing`)：自动缩放远程桌面以适应窗口大小
 
 ### 示例
 
@@ -105,6 +115,9 @@ rrdp connect 192.168.1.100 -u administrator
 
 # 全屏 + 剪贴板
 rrdp connect 10.0.0.5 -u admin --fullscreen --clipboard
+
+# 动态调整窗口 + 缩放
+rrdp connect 192.168.1.100 -u admin --dynamic-resolution --scale-desktop 150
 
 # 保存常用连接
 rrdp save win10 -s 192.168.1.100 -u administrator -d corp

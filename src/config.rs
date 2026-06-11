@@ -9,6 +9,18 @@ pub struct ConnectionConfig {
     pub username: Option<String>,
     pub domain: Option<String>,
     pub description: Option<String>,
+    #[serde(default)]
+    pub width: Option<u32>,
+    #[serde(default)]
+    pub height: Option<u32>,
+    #[serde(default)]
+    pub fullscreen: Option<bool>,
+    #[serde(default)]
+    pub dynamic_resolution: Option<bool>,
+    #[serde(default)]
+    pub scale_desktop: Option<u32>,
+    #[serde(default)]
+    pub smart_sizing: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,6 +69,12 @@ impl Config {
         username: Option<String>,
         domain: Option<String>,
         description: Option<String>,
+        width: Option<u32>,
+        height: Option<u32>,
+        fullscreen: Option<bool>,
+        dynamic_resolution: Option<bool>,
+        scale_desktop: Option<u32>,
+        smart_sizing: Option<bool>,
     ) {
         // Remove existing connection with same name
         self.connections.retain(|c| c.name != name);
@@ -67,6 +85,12 @@ impl Config {
             username,
             domain,
             description,
+            width,
+            height,
+            fullscreen,
+            dynamic_resolution,
+            scale_desktop,
+            smart_sizing,
         });
     }
 

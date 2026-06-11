@@ -15,6 +15,9 @@ pub struct ConnectionBuilder {
     audio: bool,
     nla: bool,
     tls: bool,
+    dynamic_resolution: bool,
+    scale_desktop: Option<u32>,
+    smart_sizing: bool,
     extra_args: Vec<String>,
 }
 
@@ -33,6 +36,9 @@ impl ConnectionBuilder {
             audio: false,
             nla: false,
             tls: false,
+            dynamic_resolution: false,
+            scale_desktop: None,
+            smart_sizing: false,
             extra_args: Vec::new(),
         }
     }
@@ -85,6 +91,21 @@ impl ConnectionBuilder {
 
     pub fn tls(&mut self, tls: bool) -> &mut Self {
         self.tls = tls;
+        self
+    }
+
+    pub fn dynamic_resolution(&mut self, dr: bool) -> &mut Self {
+        self.dynamic_resolution = dr;
+        self
+    }
+
+    pub fn scale_desktop(&mut self, scale: u32) -> &mut Self {
+        self.scale_desktop = Some(scale);
+        self
+    }
+
+    pub fn smart_sizing(&mut self, ss: bool) -> &mut Self {
+        self.smart_sizing = ss;
         self
     }
 
@@ -207,6 +228,21 @@ impl ConnectionBuilder {
 
         // Network
         args.push("+auto-reconnect".to_string());
+
+        // Dynamic resolution
+        if self.dynamic_resolution {
+            args.push("+dynamic-resolution".to_string());
+        }
+
+        // Scale desktop
+        if let Some(scale) = self.scale_desktop {
+            args.push(format!("/scale-desktop:{}", scale));
+        }
+
+        // Smart sizing (mutually exclusive with dynamic-resolution)
+        if self.smart_sizing && !self.dynamic_resolution {
+            args.push("+smart-sizing".to_string());
+        }
 
         // Additional arguments
         args.extend(self.extra_args.clone());
