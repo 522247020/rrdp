@@ -1,4 +1,5 @@
-use clap::{ArgAction, Parser, Subcommand};
+use clap::Parser;
+use clap::Subcommand;
 use colored::*;
 use std::process::Command;
 
@@ -14,12 +15,10 @@ mod interactive;
 /// 一个简单的 xfreerdp3 包装工具
 #[derive(Parser)]
 #[command(name = "rrdp")]
-#[command(version)]
-#[command(disable_version_flag = true)]
 #[command(about = "xfreerdp3 的简洁命令行包装工具", long_about = None)]
 struct Cli {
     /// 显示版本信息
-    #[arg(short = 'v', long = "version", action = ArgAction::Version)]
+    #[arg(short = 'v', long = "version")]
     version: bool,
 
     #[command(subcommand)]
@@ -145,6 +144,11 @@ enum Commands {
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
+
+    if cli.version {
+        println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
 
     // Check if xfreerdp3 is installed
     if !is_xfreerdp3_installed() {
