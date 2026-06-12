@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand};
 use colored::*;
 use std::process::Command;
 
@@ -14,9 +14,14 @@ mod interactive;
 /// 一个简单的 xfreerdp3 包装工具
 #[derive(Parser)]
 #[command(name = "rrdp")]
-#[command(version = "0.1.0")]
+#[command(version)]
+#[command(disable_version_flag = true)]
 #[command(about = "xfreerdp3 的简洁命令行包装工具", long_about = None)]
 struct Cli {
+    /// 显示版本信息
+    #[arg(short = 'v', long = "version", action = ArgAction::Version)]
+    version: bool,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -108,6 +113,10 @@ enum Commands {
         #[arg(short, long)]
         username: Option<String>,
 
+        /// 登录密码
+        #[arg(short, long)]
+        password: Option<String>,
+
         /// 域
         #[arg(short, long)]
         domain: Option<String>,
@@ -135,6 +144,8 @@ enum Commands {
 }
 
 fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+
     // Check if xfreerdp3 is installed
     if !is_xfreerdp3_installed() {
         eprintln!("{} 未安装 xfreerdp3！", "Error:".red().bold());
@@ -142,7 +153,6 @@ fn main() -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
-    let cli = Cli::parse();
     let mut config = Config::load()?;
 
     match &cli.command {
@@ -229,6 +239,7 @@ fn main() -> anyhow::Result<()> {
             name,
             server,
             username,
+            password,
             domain,
             description,
         }) => {
@@ -237,6 +248,7 @@ fn main() -> anyhow::Result<()> {
                 name,
                 server,
                 username.clone(),
+                password.clone(),
                 domain.clone(),
                 description.clone(),
                 None,
@@ -247,11 +259,7 @@ fn main() -> anyhow::Result<()> {
                 None,
             );
             updated_config.save()?;
-            println!(
-                "{} 连接 '{}' 保存成功！",
-                "✓".green(),
-                name.bold()
-            );
+            println!("{} 连接 '{}' 保存成功！", "✓".green(), name.bold());
         }
 
         Some(Commands::Load { name, password }) => match config.get_connection(name) {
@@ -264,7 +272,7 @@ fn main() -> anyhow::Result<()> {
                 if let Some(dom) = &conn.domain {
                     builder.domain(dom);
                 }
-                if let Some(pass) = password {
+                if let Some(pass) = password.as_ref().or(conn.password.as_ref()) {
                     builder.password(pass);
                 }
 
@@ -280,11 +288,7 @@ fn main() -> anyhow::Result<()> {
             let mut updated_config = config.clone();
             if updated_config.delete_connection(name) {
                 updated_config.save()?;
-                println!(
-                    "{} 连接 '{}' 已删除！",
-                    "🗑️ ".red(),
-                    name.bold()
-                );
+                println!("{} 连接 '{}' 已删除！", "🗑️ ".red(), name.bold());
             } else {
                 eprintln!("{} 连接 '{}' 未找到！", "Error:".red().bold(), name);
             }

@@ -7,6 +7,8 @@ pub struct ConnectionConfig {
     pub name: String,
     pub server: String,
     pub username: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
     pub domain: Option<String>,
     pub description: Option<String>,
     #[serde(default)]
@@ -67,6 +69,7 @@ impl Config {
         name: &str,
         server: &str,
         username: Option<String>,
+        password: Option<String>,
         domain: Option<String>,
         description: Option<String>,
         width: Option<u32>,
@@ -83,6 +86,7 @@ impl Config {
             name: name.to_string(),
             server: server.to_string(),
             username,
+            password,
             domain,
             description,
             width,

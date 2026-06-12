@@ -1,6 +1,6 @@
 use anyhow::Result;
 use colored::*;
-use dialoguer::{Confirm, Input, Password, Select, theme::ColorfulTheme};
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
 
 use crate::config::{Config, ConnectionConfig};
 use crate::connection::ConnectionBuilder;
@@ -106,10 +106,7 @@ fn select_connection(connections: &[ConnectionConfig]) -> Option<SelectionResult
 
 /// 从连接列表中选择一项（用于编辑/删除子菜单）
 /// Esc → None → 返回上一级
-fn select_item_from_list<'a>(
-    connections: &'a [ConnectionConfig],
-    prompt: &str,
-) -> Option<usize> {
+fn select_item_from_list<'a>(connections: &'a [ConnectionConfig], prompt: &str) -> Option<usize> {
     let theme = ColorfulTheme::default();
 
     let items: Vec<String> = connections
@@ -144,11 +141,6 @@ fn connect_to(conn: &ConnectionConfig) -> Result<()> {
         println!("  {} 用户: {}", "👤".cyan(), user);
     }
 
-    let password: String = Password::new()
-        .with_prompt("密码 (不需要则留空)")
-        .allow_empty_password(true)
-        .interact()?;
-
     let mut builder = ConnectionBuilder::new(&conn.server);
 
     if let Some(ref user) = conn.username {
@@ -157,8 +149,17 @@ fn connect_to(conn: &ConnectionConfig) -> Result<()> {
     if let Some(ref domain) = conn.domain {
         builder.domain(domain);
     }
-    if !password.is_empty() {
-        builder.password(&password);
+    if let Some(ref password) = conn.password {
+        builder.password(password);
+    } else {
+        let password: String = Password::new()
+            .with_prompt("密码 (不需要则留空)")
+            .allow_empty_password(true)
+            .interact()?;
+
+        if !password.is_empty() {
+            builder.password(&password);
+        }
     }
 
     // 应用保存的设置
@@ -215,6 +216,27 @@ fn edit_connection(config: &Config, conn: &ConnectionConfig) -> Result<()> {
         .allow_empty(true)
         .interact_text()?;
 
+    let password = if Confirm::new()
+        .with_prompt("修改保存的密码?")
+        .default(false)
+        .show_default(true)
+        .interact()?
+    {
+        let password: String = Password::new()
+            .with_prompt("新密码 (留空删除已保存密码)")
+            .allow_empty_password(true)
+            .with_confirmation("确认密码", "两次密码不匹配")
+            .interact()?;
+
+        if password.is_empty() {
+            None
+        } else {
+            Some(password)
+        }
+    } else {
+        conn.password.clone()
+    };
+
     let current_desc = conn.description.clone().unwrap_or_default();
     let description: String = Input::new()
         .with_prompt("描述 (可选，清空删除)")
@@ -257,14 +279,20 @@ fn edit_connection(config: &Config, conn: &ConnectionConfig) -> Result<()> {
         .show_default(true)
         .interact()?;
 
-    let current_scale = conn.scale_desktop.map(|s| s.to_string()).unwrap_or_default();
+    let current_scale = conn
+        .scale_desktop
+        .map(|s| s.to_string())
+        .unwrap_or_default();
     let scale_desktop_str: String = Input::new()
         .with_prompt("桌面缩放百分比 (100-500，留空不缩放)")
         .default(current_scale)
         .allow_empty(true)
         .interact_text()?;
 
-    let scale_desktop = scale_desktop_str.parse::<u32>().ok().filter(|&s| s >= 100 && s <= 500);
+    let scale_desktop = scale_desktop_str
+        .parse::<u32>()
+        .ok()
+        .filter(|&s| s >= 100 && s <= 500);
 
     let current_smart_sizing = conn.smart_sizing.unwrap_or(false);
     let smart_sizing = if dynamic_resolution {
@@ -282,9 +310,22 @@ fn edit_connection(config: &Config, conn: &ConnectionConfig) -> Result<()> {
     updated_config.save_connection(
         &name,
         &server,
-        if username.is_empty() { None } else { Some(username) },
-        if domain.is_empty() { None } else { Some(domain) },
-        if description.is_empty() { None } else { Some(description) },
+        if username.is_empty() {
+            None
+        } else {
+            Some(username)
+        },
+        password,
+        if domain.is_empty() {
+            None
+        } else {
+            Some(domain)
+        },
+        if description.is_empty() {
+            None
+        } else {
+            Some(description)
+        },
         width,
         height,
         if fullscreen { Some(true) } else { None },
@@ -327,9 +368,7 @@ fn create_and_connect(config: &Config) -> Result<()> {
     println!("\n{} 新建连接", "🔌".green());
     println!("{}", "─".repeat(40));
 
-    let name: String = Input::new()
-        .with_prompt("连接名称")
-        .interact_text()?;
+    let name: String = Input::new().with_prompt("连接名称").interact_text()?;
 
     let server: String = Input::new()
         .with_prompt("服务器地址 (如 192.168.1.100)")
@@ -402,7 +441,10 @@ fn create_and_connect(config: &Config) -> Result<()> {
         .allow_empty(true)
         .interact_text()?;
 
-    let scale_desktop = scale_desktop_str.parse::<u32>().ok().filter(|&s| s >= 100 && s <= 500);
+    let scale_desktop = scale_desktop_str
+        .parse::<u32>()
+        .ok()
+        .filter(|&s| s >= 100 && s <= 500);
 
     let smart_sizing = if dynamic_resolution {
         false
@@ -419,9 +461,26 @@ fn create_and_connect(config: &Config) -> Result<()> {
     updated_config.save_connection(
         &name,
         &server,
-        if username.is_empty() { None } else { Some(username.clone()) },
-        if domain.is_empty() { None } else { Some(domain) },
-        if description.is_empty() { None } else { Some(description) },
+        if username.is_empty() {
+            None
+        } else {
+            Some(username.clone())
+        },
+        if password.is_empty() {
+            None
+        } else {
+            Some(password.clone())
+        },
+        if domain.is_empty() {
+            None
+        } else {
+            Some(domain)
+        },
+        if description.is_empty() {
+            None
+        } else {
+            Some(description)
+        },
         width,
         height,
         if fullscreen { Some(true) } else { None },

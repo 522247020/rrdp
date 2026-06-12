@@ -122,7 +122,7 @@ impl ConnectionBuilder {
             "{} 执行: {} {}",
             "▶️ ".blue(),
             freerdp_binary.cyan(),
-            args.join(" ").yellow()
+            display_args(&args).join(" ").yellow()
         );
 
         let status = Command::new(&freerdp_binary)
@@ -136,11 +136,7 @@ impl ConnectionBuilder {
         if !status.success() {
             let exit_code = status.code().unwrap_or(-1);
             let hint = freerdp_exit_code_hint(exit_code);
-            eprintln!(
-                "{} 连接失败，退出码: {}",
-                "Error:".red().bold(),
-                exit_code
-            );
+            eprintln!("{} 连接失败，退出码: {}", "Error:".red().bold(), exit_code);
             eprintln!("  → {}", hint.cyan());
             if exit_code == 24 {
                 eprintln!(
@@ -249,6 +245,18 @@ impl ConnectionBuilder {
 
         args
     }
+}
+
+fn display_args(args: &[String]) -> Vec<String> {
+    args.iter()
+        .map(|arg| {
+            if arg.starts_with("/p:") {
+                "/p:******".to_string()
+            } else {
+                arg.clone()
+            }
+        })
+        .collect()
 }
 
 /// FreeRDP 退出码中文释义
