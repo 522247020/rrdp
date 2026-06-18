@@ -1,6 +1,16 @@
 use anyhow::{Context, Result};
 use colored::*;
+use std::fs::OpenOptions;
+use std::io::{self, Write};
+use std::os::fd::AsRawFd;
+use std::os::raw::c_int;
 use std::process::{Command, Stdio};
+
+const TCIFLUSH: c_int = 0;
+
+unsafe extern "C" {
+    fn tcflush(fd: c_int, queue_selector: c_int) -> c_int;
+}
 
 pub struct ConnectionBuilder {
     server: String,
@@ -125,16 +135,24 @@ impl ConnectionBuilder {
             display_args(&args).join(" ").yellow()
         );
 
-        let status = Command::new(&freerdp_binary)
+        print!("{} 连接中，关闭远程桌面窗口后返回终端...", "●".green());
+        io::stdout().flush().ok();
+
+        let output = Command::new(&freerdp_binary)
             .args(&args)
             .stdin(Stdio::inherit())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .status()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .context("无法启动 xfreerdp3")?
+            .wait_with_output()
             .context("无法执行 xfreerdp3")?;
 
-        if !status.success() {
-            let exit_code = status.code().unwrap_or(-1);
+        println!();
+        flush_pending_terminal_input();
+
+        if !output.status.success() {
+            let exit_code = output.status.code().unwrap_or(-1);
             let hint = freerdp_exit_code_hint(exit_code);
             eprintln!("{} 连接失败，退出码: {}", "Error:".red().bold(), exit_code);
             eprintln!("  → {}", hint.cyan());
@@ -144,6 +162,9 @@ impl ConnectionBuilder {
                     "提示: 请检查用户名/密码是否正确，或尝试调整 --nla / --tls 参数".yellow()
                 );
             }
+
+            print_process_output("stdout", &output.stdout);
+            print_process_output("stderr", &output.stderr);
         }
 
         Ok(())
@@ -245,6 +266,30 @@ impl ConnectionBuilder {
 
         args
     }
+}
+
+fn flush_pending_terminal_input() {
+    if let Ok(tty) = OpenOptions::new().read(true).open("/dev/tty") {
+        // Drop keystrokes queued while FreeRDP was active so the next menu
+        // cannot consume a stale Enter and reconnect immediately.
+        unsafe {
+            tcflush(tty.as_raw_fd(), TCIFLUSH);
+        }
+    }
+}
+
+fn print_process_output(label: &str, output: &[u8]) {
+    if output.is_empty() {
+        return;
+    }
+
+    let text = String::from_utf8_lossy(output);
+    if text.trim().is_empty() {
+        return;
+    }
+
+    eprintln!("\n{}:", label.bold());
+    eprintln!("{}", text.trim_end());
 }
 
 fn display_args(args: &[String]) -> Vec<String> {

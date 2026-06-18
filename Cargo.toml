@@ -1,6 +1,6 @@
 [package]
 name = "rrdp"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "A CLI wrapper for xfreerdp3 to simplify remote desktop connections"
 

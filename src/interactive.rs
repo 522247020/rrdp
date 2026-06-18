@@ -9,7 +9,8 @@ use crate::connection::ConnectionBuilder;
 /// 每次操作后返回菜单循环，直到用户选择退出
 pub fn run(config: &mut Config) -> Result<()> {
     loop {
-        let connections: Vec<ConnectionConfig> = config.list_connections().to_vec();
+        let mut connections: Vec<ConnectionConfig> = config.list_connections().to_vec();
+        connections.sort_by_cached_key(|conn| conn.name.to_lowercase());
 
         if connections.is_empty() {
             println!("{} 暂无已保存的连接。", "ℹ️ ".blue());
@@ -187,6 +188,36 @@ fn connect_to(conn: &ConnectionConfig) -> Result<()> {
     Ok(())
 }
 
+fn prompt_saved_password(current: Option<&str>) -> Result<Option<String>> {
+    let save_password = Confirm::new()
+        .with_prompt("保存密码到配置文件?")
+        .default(current.is_some())
+        .show_default(true)
+        .interact()?;
+
+    if !save_password {
+        return Ok(None);
+    }
+
+    let use_empty_password = Confirm::new()
+        .with_prompt("远程电脑使用空密码?")
+        .default(matches!(current, Some(password) if password.is_empty()))
+        .show_default(true)
+        .interact()?;
+
+    if use_empty_password {
+        return Ok(Some(String::new()));
+    }
+
+    let password: String = Password::new()
+        .with_prompt("密码")
+        .allow_empty_password(false)
+        .with_confirmation("确认密码", "两次密码不匹配")
+        .interact()?;
+
+    Ok(Some(password))
+}
+
 fn edit_connection(config: &Config, conn: &ConnectionConfig) -> Result<()> {
     println!("\n{} 编辑连接: {}", "✏️ ".yellow(), conn.name.bold());
     println!("{} 直接回车保留当前值，清空可选字段可删除。", "💡".blue());
@@ -222,17 +253,7 @@ fn edit_connection(config: &Config, conn: &ConnectionConfig) -> Result<()> {
         .show_default(true)
         .interact()?
     {
-        let password: String = Password::new()
-            .with_prompt("新密码 (留空删除已保存密码)")
-            .allow_empty_password(true)
-            .with_confirmation("确认密码", "两次密码不匹配")
-            .interact()?;
-
-        if password.is_empty() {
-            None
-        } else {
-            Some(password)
-        }
+        prompt_saved_password(conn.password.as_deref())?
     } else {
         conn.password.clone()
     };
@@ -395,11 +416,7 @@ fn create_and_connect(config: &Config) -> Result<()> {
         .allow_empty(true)
         .interact_text()?;
 
-    let password: String = Password::new()
-        .with_prompt("密码 (可选)")
-        .allow_empty_password(true)
-        .with_confirmation("确认密码", "两次密码不匹配")
-        .interact()?;
+    let password = prompt_saved_password(None)?;
 
     // 显示显示设置选项
     println!("\n{} 显示设置", "🖥️ ".cyan());
@@ -466,11 +483,7 @@ fn create_and_connect(config: &Config) -> Result<()> {
         } else {
             Some(username.clone())
         },
-        if password.is_empty() {
-            None
-        } else {
-            Some(password.clone())
-        },
+        password.clone(),
         if domain.is_empty() {
             None
         } else {
@@ -496,8 +509,8 @@ fn create_and_connect(config: &Config) -> Result<()> {
     if !username.is_empty() {
         builder.username(&username);
     }
-    if !password.is_empty() {
-        builder.password(&password);
+    if let Some(ref password) = password {
+        builder.password(password);
     }
 
     // 应用显示设置

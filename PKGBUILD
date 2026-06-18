@@ -2,7 +2,7 @@
 # Contributor: Your Name <your@email.com>
 
 pkgname=rrdp
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="xfreerdp3 的简洁命令行包装工具 / A CLI wrapper for xfreerdp3"
 arch=('x86_64')
@@ -11,7 +11,7 @@ license=('MIT')
 depends=('freerdp')
 makedepends=('cargo')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
-sha256sums=('c479714b7436af74c9f4abe78134a04d2bf742cc8e869c22f267129edc556954')
+sha256sums=('SKIP')
 
 build() {
     cd "$srcdir/$pkgname-$pkgver"

@@ -218,12 +218,13 @@ fn main() -> anyhow::Result<()> {
         }
 
         Some(Commands::List) => {
-            let connections = config.list_connections();
+            let mut connections = config.list_connections().to_vec();
+            connections.sort_by_cached_key(|conn| conn.name.to_lowercase());
             if connections.is_empty() {
                 println!("{} 暂无已保存的连接。", "ℹ️ ".blue());
             } else {
                 println!("{} 已保存的连接:", "📋".green());
-                for conn in connections {
+                for conn in &connections {
                     println!("  {} - {}", conn.name.bold(), conn.server);
                     if let Some(desc) = &conn.description {
                         println!("    描述: {}", desc);
