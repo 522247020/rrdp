@@ -1,6 +1,7 @@
 use clap::Parser;
 use clap::Subcommand;
 use colored::*;
+use dialoguer::Password;
 use std::process::Command;
 
 mod config;
@@ -10,6 +11,7 @@ use config::Config;
 use connection::ConnectionBuilder;
 
 mod interactive;
+mod tray;
 
 /// RRDP - Rust Remote Desktop Protocol 客户端
 /// 一个简单的 xfreerdp3 包装工具
@@ -135,6 +137,16 @@ enum Commands {
         password: Option<String>,
     },
 
+    /// 添加主机配置，不立即连接
+    Add,
+
+    /// 启动 Linux 托盘图标
+    Tray,
+
+    /// 托盘后台工作进程（内部使用）
+    #[command(name = "tray-worker", hide = true)]
+    TrayWorker,
+
     /// 删除已保存的连接
     Delete {
         /// 要删除的连接名称
@@ -148,6 +160,12 @@ fn main() -> anyhow::Result<()> {
     if cli.version {
         println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
         return Ok(());
+    }
+
+    match cli.command.as_ref() {
+        Some(Commands::Tray) => return tray::start_background(),
+        Some(Commands::TrayWorker) => return tray::run(),
+        _ => {}
     }
 
     // Check if xfreerdp3 is installed
@@ -217,6 +235,10 @@ fn main() -> anyhow::Result<()> {
             builder.connect()?;
         }
 
+        Some(Commands::Add) => {
+            interactive::add_connection(&config)?;
+        }
+
         Some(Commands::List) => {
             let mut connections = config.list_connections().to_vec();
             connections.sort_by_cached_key(|conn| conn.name.to_lowercase());
@@ -269,16 +291,17 @@ fn main() -> anyhow::Result<()> {
 
         Some(Commands::Load { name, password }) => match config.get_connection(name) {
             Some(conn) => {
-                let mut builder = ConnectionBuilder::new(&conn.server);
-
-                if let Some(user) = &conn.username {
-                    builder.username(user);
-                }
-                if let Some(dom) = &conn.domain {
-                    builder.domain(dom);
-                }
-                if let Some(pass) = password.as_ref().or(conn.password.as_ref()) {
+                let mut builder = ConnectionBuilder::from_config(conn);
+                if let Some(pass) = password.as_ref() {
                     builder.password(pass);
+                } else if conn.password.is_none() {
+                    let pass = Password::new()
+                        .with_prompt("密码 (不需要则留空)")
+                        .allow_empty_password(true)
+                        .interact()?;
+                    if !pass.is_empty() {
+                        builder.password(&pass);
+                    }
                 }
 
                 println!("{} 正在加载连接: {}", "🔄".blue(), name.bold());
@@ -288,6 +311,10 @@ fn main() -> anyhow::Result<()> {
                 eprintln!("{} 连接 '{}' 未找到！", "Error:".red().bold(), name);
             }
         },
+
+        Some(Commands::Tray) | Some(Commands::TrayWorker) => {
+            unreachable!("tray commands are handled before loading configuration")
+        }
 
         Some(Commands::Delete { name }) => {
             let mut updated_config = config.clone();

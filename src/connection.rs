@@ -1,10 +1,12 @@
 use anyhow::{Context, Result};
 use colored::*;
+
+use crate::config::ConnectionConfig;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::os::fd::AsRawFd;
 use std::os::raw::c_int;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 
 const TCIFLUSH: c_int = 0;
 
@@ -122,6 +124,43 @@ impl ConnectionBuilder {
     pub fn extra_args(&mut self, args: Vec<String>) -> &mut Self {
         self.extra_args = args;
         self
+    }
+
+    pub fn from_config(config: &ConnectionConfig) -> Self {
+        let mut builder = Self::new(&config.server);
+
+        if let Some(username) = &config.username {
+            builder.username(username);
+        }
+        if let Some(password) = &config.password {
+            builder.password(password);
+        }
+        if let Some(domain) = &config.domain {
+            builder.domain(domain);
+        }
+        if let (Some(width), Some(height)) = (config.width, config.height) {
+            builder.size(width, height);
+        }
+        builder
+            .fullscreen(config.fullscreen.unwrap_or(false))
+            .dynamic_resolution(config.dynamic_resolution.unwrap_or(false))
+            .smart_sizing(config.smart_sizing.unwrap_or(false));
+        if let Some(scale) = config.scale_desktop {
+            builder.scale_desktop(scale);
+        }
+
+        builder
+    }
+
+    pub fn spawn_silent(&self) -> Result<Child> {
+        let freerdp_binary = self.find_freerdp_binary()?;
+        Command::new(freerdp_binary)
+            .args(self.build_args())
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .context("无法启动 FreeRDP")
     }
 
     pub fn connect(&self) -> Result<()> {

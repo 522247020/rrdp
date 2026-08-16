@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=RRDP Tray
+Comment=RRDP remote desktop host manager
+TryExec=rrdp
+Exec=rrdp tray
+Icon=computer
+Terminal=false
+Categories=Network;RemoteAccess;
+X-GNOME-Autostart-enabled=true

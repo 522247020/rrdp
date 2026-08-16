@@ -135,24 +135,16 @@ fn select_item_from_list<'a>(connections: &'a [ConnectionConfig], prompt: &str) 
         .expect("读取选择失败")
 }
 
-fn connect_to(conn: &ConnectionConfig) -> Result<()> {
+pub fn connect_to(conn: &ConnectionConfig) -> Result<()> {
     println!("\n{} 已选择: {}", "🔗".cyan(), conn.name.bold());
     println!("  {} 服务器: {}", "🖥️ ".cyan(), conn.server.cyan());
     if let Some(ref user) = conn.username {
         println!("  {} 用户: {}", "👤".cyan(), user);
     }
 
-    let mut builder = ConnectionBuilder::new(&conn.server);
+    let mut builder = ConnectionBuilder::from_config(conn);
 
-    if let Some(ref user) = conn.username {
-        builder.username(user);
-    }
-    if let Some(ref domain) = conn.domain {
-        builder.domain(domain);
-    }
-    if let Some(ref password) = conn.password {
-        builder.password(password);
-    } else {
+    if conn.password.is_none() {
         let password: String = Password::new()
             .with_prompt("密码 (不需要则留空)")
             .allow_empty_password(true)
@@ -161,25 +153,6 @@ fn connect_to(conn: &ConnectionConfig) -> Result<()> {
         if !password.is_empty() {
             builder.password(&password);
         }
-    }
-
-    // 应用保存的设置
-    if let Some(width) = conn.width {
-        if let Some(height) = conn.height {
-            builder.size(width, height);
-        }
-    }
-    if let Some(fullscreen) = conn.fullscreen {
-        builder.fullscreen(fullscreen);
-    }
-    if let Some(dr) = conn.dynamic_resolution {
-        builder.dynamic_resolution(dr);
-    }
-    if let Some(scale) = conn.scale_desktop {
-        builder.scale_desktop(scale);
-    }
-    if let Some(ss) = conn.smart_sizing {
-        builder.smart_sizing(ss);
     }
 
     println!("\n{} 正在连接到 {}...", "🚀".green(), conn.server.cyan());
@@ -382,6 +355,53 @@ fn delete_connection(config: &Config, conn: &ConnectionConfig) -> Result<()> {
         println!("{} 已取消删除。", "ℹ️ ".blue());
     }
 
+    Ok(())
+}
+
+pub fn add_connection(config: &Config) -> Result<()> {
+    println!("\n{} 新建主机", "➕".green());
+    println!("{}", "─".repeat(40));
+
+    let name: String = Input::new().with_prompt("连接名称").interact_text()?;
+    let server: String = Input::new()
+        .with_prompt("服务器地址 (如 192.168.1.100)")
+        .interact_text()?;
+    let username: String = Input::new()
+        .with_prompt("用户名 (可选)")
+        .default(String::new())
+        .show_default(false)
+        .allow_empty(true)
+        .interact_text()?;
+    let domain: String = Input::new()
+        .with_prompt("域名 (可选)")
+        .default(String::new())
+        .show_default(false)
+        .allow_empty(true)
+        .interact_text()?;
+    let description: String = Input::new()
+        .with_prompt("描述 (可选)")
+        .default(String::new())
+        .show_default(false)
+        .allow_empty(true)
+        .interact_text()?;
+
+    let mut updated_config = config.clone();
+    updated_config.save_connection(
+        &name,
+        &server,
+        (!username.is_empty()).then_some(username),
+        None,
+        (!domain.is_empty()).then_some(domain),
+        (!description.is_empty()).then_some(description),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    );
+    updated_config.save()?;
+    println!("{} 主机 '{}' 已保存！", "✓".green(), name.bold());
     Ok(())
 }
 
